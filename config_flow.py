@@ -86,9 +86,6 @@ class HondaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             email = user_input[CONF_EMAIL].strip()
             password = user_input[CONF_PASSWORD]
-            #            pin = user_input[CONF_PIN].strip()
-            #            vin = user_input.get(CONF_VIN, "").strip().upper()
-            #            self._custom_name = user_input.get(CONF_NAME, "").strip() or None
             device_id = str(uuid.uuid4())
             session_id = str(uuid.uuid4())
 
@@ -125,64 +122,19 @@ class HondaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_PASSWORD: password,
                 }
                 return await self.async_step_vehicle()
-        #                vehicle_info: dict[str, Any] | None = None
-        #                if vin:
-        #                    vehicle_info = next(
-        #                        (item for item in vehicles if item.get("VIN") == vin), None
-        #                    )
-        #                    if vehicle_info is None:
-        #                        try:
-        #                            vehicle_info = await api.async_get_vehicle_by_vin(vin)
-        #                        except HondaLinkError as err:
-        #                            _LOGGER.warning(
-        #                                "HondaLink VIN lookup failed for %s during config flow: %s",
-        #                                vin,
-        #                                err,
-        #                            )
-        #                            vehicle_info = None
-
-        #                if len(vehicles) == 1:
-        #                    vehicle_info = vehicles[0]
-        #                    vin = str(vehicle_info.get("VIN", "")).upper()
-        #                    api.vin = vin
-        #                elif len(vehicles) > 1:
-        #                    self._api = api
-        #                    self._vehicles = vehicles
-        #                    self._base_data = self._entry_data(
-        #                        api, email, password, pin, "", None
-        #                    )
-        #                    return await self.async_step_vehicle()
-        #                else:
-        #                    errors["base"] = "vin_required"
-
-        #                if not errors:
-        #                    if not vin:
-        #                        errors["base"] = "vin_required"
-        #                    else:
-        #                        api.vin = vin
-        #                        return await self._async_create_vehicle_entry(
-        #                            api, email, password, pin, vin, vehicle_info
-        #                        )
 
         schema = vol.Schema(
             {
-                vol.Required(
-                    CONF_EMAIL, default="schmitt.matt@icloud.com"
-                ): TextSelector(
+                vol.Required(CONF_EMAIL): TextSelector(
                     TextSelectorConfig(
                         type=TextSelectorType.EMAIL,
                     )
                 ),
-                vol.Required(
-                    CONF_PASSWORD, default="AE8GTFpRrDLQN9ybgKen"
-                ): TextSelector(
+                vol.Required(CONF_PASSWORD): TextSelector(
                     TextSelectorConfig(
                         type=TextSelectorType.PASSWORD,
                     )
                 ),
-                #                vol.Required(CONF_PIN): str,
-                #                vol.Optional(CONF_VIN, default=""): str,
-                #                vol.Optional(CONF_NAME, default=""): str,
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
@@ -220,12 +172,6 @@ class HondaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                #                vol.Required(CONF_VIN): vol.In(
-                #                    {
-                #                        vin: _vehicle_label(vehicle)
-                #                        for vin, vehicle in vehicles_by_vin.items()
-                #                    }
-                #                ),
                 vol.Required(CONF_NAME): SelectSelector(
                     SelectSelectorConfig(
                         options=[

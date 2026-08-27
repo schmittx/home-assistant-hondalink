@@ -255,8 +255,6 @@ class HondaLinkAPI:
             raise HondaLinkError(f"Dashboard request failed: {_redact_payload(data)}")
         return data
 
-    #        return DashboardData(vin=vin, data=data.get("responseBody", {}))
-
     async def async_request_dashboard_update(
         self, vin: str | None = None
     ) -> HondaLinkCommandResult:
@@ -556,35 +554,3 @@ class HondaLinkAPI:
         if not self.pin:
             raise HondaLinkCommandError("Remote PIN is required")
         return self.pin
-
-
-class DashboardData:
-    """Dashboard data."""
-
-    def __init__(self, vin: str, data: dict[str, Any]) -> None:
-        """Initialize."""
-        self.vin = vin
-        self.data = data
-
-    @property
-    def name(self) -> str | None:
-        """Name."""
-        return self.data.get("name")
-
-    @property
-    def first_row_driver_door_opened(self) -> bool:
-        """First row driver door opened."""
-        value = (
-            self.data.get("doorStatus", {}).get("firstRowDriver", {}).get("openState")
-        )
-        return isinstance(value, str) and value.lower() != "closed"
-
-    @property
-    def first_row_passenger_door_opened(self) -> bool:
-        """First row passenger door opened."""
-        value = (
-            self.data.get("doorStatus", {})
-            .get("firstRowPassenger", {})
-            .get("openState")
-        )
-        return isinstance(value, str) and value.lower() != "closed"
