@@ -1,3 +1,5 @@
+"""Constants used by the HondaLink integration."""
+
 from datetime import timedelta
 
 DOMAIN = "hondalink"

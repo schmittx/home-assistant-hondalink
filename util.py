@@ -1,10 +1,11 @@
-from __future__ import annotations
+"""Utilities for HondaLink integration."""
 
 from datetime import datetime
 from typing import Any
 
 
 def get_path(data: dict[str, Any], path: str, default: Any = None) -> Any:
+    """Get path."""
     cur: Any = data
     for part in path.split("."):
         if isinstance(cur, dict):
@@ -17,29 +18,33 @@ def get_path(data: dict[str, Any], path: str, default: Any = None) -> Any:
 
 
 def status_body(data: dict[str, Any]) -> dict[str, Any]:
+    """Status body."""
     body = data.get("responseBody")
     return body if isinstance(body, dict) else {}
 
 
 def to_int(value: Any) -> int | None:
+    """To int."""
     try:
         if value in (None, "", "unknown"):
             return None
         return int(float(value))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
 def to_float(value: Any) -> float | None:
+    """To float."""
     try:
         if value in (None, "", "unknown"):
             return None
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
 def first_path(data: dict[str, Any], paths: tuple[str, ...]) -> Any:
+    """First path."""
     for path in paths:
         value = get_path(data, path)
         if value not in (None, "", "unknown"):
@@ -48,6 +53,7 @@ def first_path(data: dict[str, Any], paths: tuple[str, ...]) -> Any:
 
 
 def value_from_status_node(value: Any) -> Any:
+    """Value from status node."""
     if not isinstance(value, dict):
         return value
     for key in (
@@ -70,6 +76,7 @@ def value_from_status_node(value: Any) -> Any:
 
 
 def find_12v_battery_status(data: dict[str, Any]) -> Any:
+    """Find 12v battery status."""
     warning_lamp_status = _find_12v_warning_lamp_status(data)
     if warning_lamp_status not in (None, "", "unknown"):
         return warning_lamp_status
@@ -109,12 +116,14 @@ def find_12v_battery_status(data: dict[str, Any]) -> Any:
 
 
 def find_12v_battery_candidates(data: dict[str, Any]) -> dict[str, Any]:
+    """Find 12v battery candidates."""
     candidates: dict[str, Any] = {}
     _collect_12v_battery_candidates(data, "", candidates)
     return candidates
 
 
 def leaf_paths(data: dict[str, Any], *, limit: int = 300) -> list[str]:
+    """Leaf paths."""
     paths: list[str] = []
     _collect_leaf_paths(data, "", paths, limit)
     return paths
@@ -127,9 +136,13 @@ def _find_12v_warning_lamp_status(data: dict[str, Any]) -> Any:
         for message in group.get("messages", []) or []:
             if not isinstance(message, dict):
                 continue
-            text = " ".join(str(value) for value in message.values() if isinstance(value, str))
+            text = " ".join(
+                str(value) for value in message.values() if isinstance(value, str)
+            )
             text_lower = text.lower()
-            has_12v = "12v" in text_lower or "12 v" in text_lower or "12 volt" in text_lower
+            has_12v = (
+                "12v" in text_lower or "12 v" in text_lower or "12 volt" in text_lower
+            )
             has_battery = "battery" in text_lower or "batt" in text_lower
             if has_12v and has_battery:
                 return (
@@ -150,7 +163,9 @@ def _find_12v_text_status(value: Any) -> Any:
         text = " ".join(str(item) for item in value.values() if isinstance(item, str))
         if _text_mentions_12v_battery(text):
             status = value_from_status_node(value)
-            if status not in (None, "", "unknown") and not _text_mentions_12v_battery(str(status)):
+            if status not in (None, "", "unknown") and not _text_mentions_12v_battery(
+                str(status)
+            ):
                 return status
             for key in (
                 "normal",
@@ -200,7 +215,9 @@ def _find_12v_battery_status(value: Any) -> Any:
     return None
 
 
-def _collect_12v_battery_candidates(value: Any, path: str, candidates: dict[str, Any]) -> None:
+def _collect_12v_battery_candidates(
+    value: Any, path: str, candidates: dict[str, Any]
+) -> None:
     if len(candidates) >= 20:
         return
     if isinstance(value, dict):
@@ -210,11 +227,15 @@ def _collect_12v_battery_candidates(value: Any, path: str, candidates: dict[str,
                 isinstance(item, str) and _text_mentions_12v_battery(item)
             ):
                 candidate = value_from_status_node(item)
-                candidates[item_path] = _attribute_safe_value(candidate if candidate is not None else item)
+                candidates[item_path] = _attribute_safe_value(
+                    candidate if candidate is not None else item
+                )
             _collect_12v_battery_candidates(item, item_path, candidates)
     elif isinstance(value, list):
         for index, item in enumerate(value[:20]):
-            _collect_12v_battery_candidates(item, f"{path}.{index}" if path else str(index), candidates)
+            _collect_12v_battery_candidates(
+                item, f"{path}.{index}" if path else str(index), candidates
+            )
 
 
 def _collect_leaf_paths(value: Any, path: str, paths: list[str], limit: int) -> None:
@@ -240,10 +261,17 @@ def _collect_leaf_paths(value: Any, path: str, paths: list[str], limit: int) -> 
 
 def _looks_like_12v_battery_key(key: str) -> bool:
     key_lower = key.lower()
-    has_12v = "12v" in key_lower or "12_v" in key_lower or "twelvevolt" in key_lower or "twelve_volt" in key_lower
+    has_12v = (
+        "12v" in key_lower
+        or "12_v" in key_lower
+        or "twelvevolt" in key_lower
+        or "twelve_volt" in key_lower
+    )
     has_battery = "battery" in key_lower or "batt" in key_lower
     has_voltage = "volt" in key_lower
-    has_status = "status" in key_lower or "state" in key_lower or "condition" in key_lower
+    has_status = (
+        "status" in key_lower or "state" in key_lower or "condition" in key_lower
+    )
     has_aux = "aux" in key_lower or "auxiliary" in key_lower
     has_power_supply = "powersupply" in key_lower or "power_supply" in key_lower
     return (
@@ -276,15 +304,18 @@ def _attribute_safe_value(value: Any) -> Any:
 
 
 def parse_iso_datetime(value: Any) -> datetime | None:
+    """Parse ISO datetime."""
     if not value or value == "unknown":
         return None
     try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        #        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return datetime.fromisoformat(str(value))
     except ValueError:
         return None
 
 
 def dms_to_decimal(value: Any) -> float | None:
+    """DMS to decimal."""
     if not value or value == "unknown":
         return None
     try:
@@ -296,16 +327,22 @@ def dms_to_decimal(value: Any) -> float | None:
         minutes = float(parts[1])
         seconds = float(parts[2])
         return sign * (abs(degrees) + minutes / 60 + seconds / 3600)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
 def all_door_locks_locked(body: dict[str, Any]) -> bool | None:
+    """All door locks locked."""
     doors = get_path(body, "doorStatus", {})
     if not isinstance(doors, dict):
         return None
     states: list[str] = []
-    for key in ("firstRowDriver", "firstRowPassenger", "secondRowDriver", "secondRowPassenger"):
+    for key in (
+        "firstRowDriver",
+        "firstRowPassenger",
+        "secondRowDriver",
+        "secondRowPassenger",
+    ):
         state = get_path(doors, f"{key}.lockState")
         if state:
             states.append(str(state))
@@ -314,7 +351,10 @@ def all_door_locks_locked(body: dict[str, Any]) -> bool | None:
     return all(state.lower() == "lock" for state in states)
 
 
-def any_open_state(body: dict[str, Any], base: str, keys: list[str], state_key: str = "openState") -> bool | None:
+def any_open_state(
+    body: dict[str, Any], base: str, keys: list[str], state_key: str = "openState"
+) -> bool | None:
+    """Any open state."""
     found = False
     for key in keys:
         value = get_path(body, f"{base}.{key}.{state_key}")
@@ -326,6 +366,7 @@ def any_open_state(body: dict[str, Any], base: str, keys: list[str], state_key: 
 
 
 def any_light_on(body: dict[str, Any]) -> bool | None:
+    """Any light on."""
     lights = get_path(body, "lightStatus", {})
     if not isinstance(lights, dict):
         return None
@@ -336,3 +377,28 @@ def any_light_on(body: dict[str, Any]) -> bool | None:
             if str(item.get("lightState")).upper() != "OFF":
                 return True
     return False if found else None
+
+
+def maintenance_minder_on(body: dict[str, Any]) -> bool | None:
+    """Maintenance minder on."""
+    for data in get_path(body, "maintenanceMinder.data", []):
+        if not isinstance(data, dict):
+            return None
+        return bool(data.get("messages"))
+    return None
+
+
+def maintenance_required(body: dict[str, Any]) -> str | None:
+    """Maintenance required."""
+    _maintenance_required = []
+    for data in get_path(body, "maintenanceMinder.data", []):
+        if not isinstance(data, dict):
+            return None
+        for message in data.get("messages", []):
+            code = message.get("mmCode")
+            if code and isinstance(code, str):
+                _maintenance_required.append(code)
+    _maintenance_required.sort(
+        key=lambda code: (code.isdigit(), int(code) if code.isdigit() else code)
+    )
+    return "".join(_maintenance_required) if _maintenance_required else None

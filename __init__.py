@@ -1,5 +1,6 @@
-from __future__ import annotations
+"""The HondaLink integration."""
 
+from datetime import timedelta
 import uuid
 
 import aiohttp
@@ -23,27 +24,30 @@ from .const import (
     CONF_PASSWORD,
     CONF_PIN,
     CONF_REFRESH_TOKEN,
+    CONF_SCAN_INTERVAL,
     CONF_SESSION_ID,
     CONF_UNLOCK_COMMAND,
     CONF_VIN,
     DATA_API,
     DATA_COORDINATOR,
     DEFAULT_LOCK_COMMAND,
+    DEFAULT_SCAN_INTERVAL,
     DEFAULT_UNLOCK_COMMAND,
     DOMAIN,
 )
 from .coordinator import HondaLinkDataUpdateCoordinator
 
 PLATFORMS: list[Platform] = [
-    Platform.SENSOR,
     Platform.BINARY_SENSOR,
-    Platform.LOCK,
     Platform.BUTTON,
     Platform.DEVICE_TRACKER,
+    Platform.LOCK,
+    Platform.SENSOR,
 ]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
     data = dict(entry.data)
@@ -90,11 +94,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         DATA_COORDINATOR: coordinator,
     }
 
+    entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
+async def _async_entry_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Apply options changes to the running api/coordinator.
+
+    Applied in place (rather than reloading the entry) because setup itself
+    updates entry.data with refreshed tokens, which would retrigger a
+    reload-on-update listener.
+    """
+    config_entry = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if not config_entry:
+        return
+    api = config_entry[DATA_API]
+    api.pin = entry.options.get(CONF_PIN, entry.data.get(CONF_PIN)) or ""
+    api.lock_command = entry.options.get(CONF_LOCK_COMMAND, DEFAULT_LOCK_COMMAND)
+    api.unlock_command = entry.options.get(CONF_UNLOCK_COMMAND, DEFAULT_UNLOCK_COMMAND)
+    config_entry[DATA_COORDINATOR].update_interval = timedelta(
+        minutes=int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
+    )
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)

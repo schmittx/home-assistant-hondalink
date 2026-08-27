@@ -1,4 +1,4 @@
-from __future__ import annotations
+"""Base class for HondaLink entities."""
 
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -8,9 +8,14 @@ from .coordinator import HondaLinkDataUpdateCoordinator
 
 
 class HondaLinkEntity(CoordinatorEntity[HondaLinkDataUpdateCoordinator]):
+    """Representation of a HondaLink entity."""
+
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: HondaLinkDataUpdateCoordinator, entry, key: str) -> None:
+    def __init__(
+        self, coordinator: HondaLinkDataUpdateCoordinator, entry, key: str
+    ) -> None:
+        """Initialize the entity."""
         super().__init__(coordinator)
         self.entry = entry
         self.vin = entry.data[CONF_VIN]
@@ -18,6 +23,10 @@ class HondaLinkEntity(CoordinatorEntity[HondaLinkDataUpdateCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
+        """Return device specific attributes.
+
+        Implemented by platform classes.
+        """
         vehicle = self.entry.data.get(CONF_VEHICLE_INFO) or {}
         year = vehicle.get("ModelYear")
         model = vehicle.get("ModelGroupNameFriendly") or vehicle.get("ModelCode")

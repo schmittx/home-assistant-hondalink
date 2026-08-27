@@ -1,4 +1,4 @@
-from __future__ import annotations
+"""Data update coordinator for the HondaLink integration."""
 
 from datetime import timedelta
 import logging
@@ -16,7 +16,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class HondaLinkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api: HondaLinkAPI) -> None:
+    """HondaLink data update coordinator."""
+
+    def __init__(
+        self, hass: HomeAssistant, entry: ConfigEntry, api: HondaLinkAPI
+    ) -> None:
+        """Initialize."""
         self.api = api
         self.vin = entry.data[CONF_VIN]
         interval = int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
@@ -34,6 +39,7 @@ class HondaLinkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise UpdateFailed(str(err)) from err
 
     async def async_force_refresh(self) -> None:
+        """Async force refresh."""
         try:
             await self.api.async_request_dashboard_update(self.vin)
         except HondaLinkCommandError as err:
@@ -43,24 +49,31 @@ class HondaLinkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.async_refresh()
 
     async def async_start_engine(self) -> None:
+        """Async start engine."""
         await self._run_command(self.api.async_start_engine)
 
     async def async_stop_engine(self) -> None:
+        """Async stop engine."""
         await self._run_command(self.api.async_stop_engine)
 
     async def async_lock(self) -> None:
+        """Async lock."""
         await self._run_command(self.api.async_lock)
 
     async def async_unlock(self) -> None:
+        """Async unlock."""
         await self._run_command(self.api.async_unlock)
 
     async def async_horn(self) -> None:
+        """Async horn."""
         await self._run_command(self.api.async_horn)
 
     async def async_lights(self) -> None:
+        """Async lights."""
         await self._run_command(self.api.async_lights)
 
     async def async_stop_horn_lights(self) -> None:
+        """Async stop horn lights."""
         await self._run_command(self.api.async_stop_horn_lights)
 
     async def _run_command(self, command) -> None:

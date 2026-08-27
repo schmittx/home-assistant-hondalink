@@ -1,14 +1,15 @@
-from __future__ import annotations
+"""HondaLink API."""
 
 import asyncio
+from dataclasses import dataclass
 import json
 import time
-import uuid
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any
+import uuid
 
 import aiohttp
+
+from homeassistant.util import dt as dt_util
 
 from .const import (
     API_BASE,
@@ -30,9 +31,9 @@ from .const import (
     DEFAULT_LOCK_COMMAND,
     DEFAULT_UNLOCK_COMMAND,
     DEVICE_DESCRIPTION,
+    HONDA_HEADER_VERSION,
     HONDALINK_BUSINESS_ID,
     HONDALINK_SYSTEM_ID,
-    HONDA_HEADER_VERSION,
     IDENTITY_BASE,
     LEGACY_LOCK_COMMAND,
     LEGACY_UNLOCK_COMMAND,
@@ -43,25 +44,28 @@ _INVALID_SCOPE_ERROR_CODE = "0001-01-1150"
 
 
 class HondaLinkError(Exception):
-    pass
+    """HondaLink error."""
 
 
 class HondaLinkAuthError(HondaLinkError):
-    pass
+    """HondaLink auth error."""
 
 
 class HondaLinkCommandError(HondaLinkError):
-    pass
+    """HondaLink command error."""
 
 
 @dataclass
 class HondaLinkCommandResult:
+    """HondaLink command result."""
+
     request_id: str | None
     response: dict[str, Any]
 
 
 def utc_timestamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    """UTC timestamp."""
+    return dt_util.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _lower_status(value: Any) -> str:
@@ -70,12 +74,18 @@ def _lower_status(value: Any) -> str:
 
 def _is_dynamic_backend_error(err: Exception) -> bool:
     text = str(err)
-    return _DYNAMIC_BACKEND_ERROR_CODE in text or "Dynamic backend host not specified" in text
+    return (
+        _DYNAMIC_BACKEND_ERROR_CODE in text
+        or "Dynamic backend host not specified" in text
+    )
 
 
 def _is_invalid_scope_error(err: Exception) -> bool:
     text = str(err)
-    return _INVALID_SCOPE_ERROR_CODE in text or "requested scope is invalid" in text.lower()
+    return (
+        _INVALID_SCOPE_ERROR_CODE in text
+        or "requested scope is invalid" in text.lower()
+    )
 
 
 def _redact_payload(value: Any) -> Any:
@@ -99,13 +109,15 @@ def _redact_payload(value: Any) -> Any:
 
 
 class HondaLinkAPI:
+    """HondaLink API."""
+
     def __init__(
         self,
         session: aiohttp.ClientSession,
         *,
         email: str,
         password: str,
-        pin: str | None,
+        pin: str | None = None,
         vin: str | None = None,
         client_reg_key: str | None = None,
         access_token: str | None = None,
@@ -119,6 +131,7 @@ class HondaLinkAPI:
         lock_command: str = DEFAULT_LOCK_COMMAND,
         unlock_command: str = DEFAULT_UNLOCK_COMMAND,
     ) -> None:
+        """Initialize."""
         self.session = session
         self.email = email
         self.password = password
@@ -137,6 +150,7 @@ class HondaLinkAPI:
         self.unlock_command = unlock_command or DEFAULT_UNLOCK_COMMAND
 
     async def async_register_client(self) -> str:
+        """Async register client."""
         data = await self._request_identity(
             "POST",
             "/hidas/rs/client/register",
@@ -145,10 +159,13 @@ class HondaLinkAPI:
         try:
             self.client_reg_key = data["clientregistrationkey"]["client_reg_key"]
         except (KeyError, TypeError) as err:
-            raise HondaLinkAuthError(f"Client registration failed: {_redact_payload(data)}") from err
+            raise HondaLinkAuthError(
+                f"Client registration failed: {_redact_payload(data)}"
+            ) from err
         return self.client_reg_key
 
     async def async_login(self) -> None:
+        """Async login."""
         if not self.client_reg_key:
             await self.async_register_client()
 
@@ -170,7 +187,9 @@ class HondaLinkAPI:
         user = data.get("user") or {}
         access_token = token.get("access_token")
         if not access_token:
-            raise HondaLinkAuthError(f"Login did not return access_token: {_redact_payload(data)}")
+            raise HondaLinkAuthError(
+                f"Login did not return access_token: {_redact_payload(data)}"
+            )
 
         self.access_token = access_token
         self.refresh_token = token.get("refresh_token")
@@ -181,11 +200,13 @@ class HondaLinkAPI:
         self.hidas_ident = user.get("hidas_ident") or self.hidas_ident
 
     async def async_ensure_login(self) -> None:
+        """Async ensure login."""
         if self.access_token and self.expires_at > time.time() and self.hidas_ident:
             return
         await self.async_login()
 
     def export_auth_data(self) -> dict[str, Any]:
+        """Export auth data."""
         return {
             CONF_CLIENT_REG_KEY: self.client_reg_key,
             CONF_ACCESS_TOKEN: self.access_token,
@@ -199,6 +220,7 @@ class HondaLinkAPI:
         }
 
     async def async_get_vehicles(self) -> list[dict[str, Any]]:
+        """Async get vehicles."""
         data = await self._request_api("GET", "/REST/NGT/MyVehicle/1.0")
         if _lower_status(data.get("status")) not in ("success", ""):
             raise HondaLinkError(f"Vehicle lookup failed: {_redact_payload(data)}")
@@ -206,6 +228,7 @@ class HondaLinkAPI:
         return vehicles if isinstance(vehicles, list) else []
 
     async def async_get_vehicle_by_vin(self, vin: str) -> dict[str, Any] | None:
+        """Async get vehicle by VIN."""
         data = await self._request_api("GET", f"/REST/NGT/MyVehicle/1.0/{vin}")
         vehicles = data.get("vehicleInfo") or []
         if isinstance(vehicles, list) and vehicles:
@@ -213,9 +236,13 @@ class HondaLinkAPI:
         return None
 
     async def async_get_profile(self, vin: str) -> dict[str, Any]:
+        """Async get profile."""
         return await self._request_api("GET", f"/REST/NGT/myProfile/1.0/{vin}")
 
-    async def async_get_dashboard_latest(self, vin: str | None = None) -> dict[str, Any]:
+    async def async_get_dashboard_latest(
+        self, vin: str | None = None
+    ) -> dict[str, Any]:
+        """Async get dashboard latest."""
         vin = vin or self.vin
         if not vin:
             raise HondaLinkError("VIN is required")
@@ -228,7 +255,12 @@ class HondaLinkAPI:
             raise HondaLinkError(f"Dashboard request failed: {_redact_payload(data)}")
         return data
 
-    async def async_request_dashboard_update(self, vin: str | None = None) -> HondaLinkCommandResult:
+    #        return DashboardData(vin=vin, data=data.get("responseBody", {}))
+
+    async def async_request_dashboard_update(
+        self, vin: str | None = None
+    ) -> HondaLinkCommandResult:
+        """Async request dashboard update."""
         vin = vin or self.vin
         if not vin:
             raise HondaLinkError("VIN is required")
@@ -264,10 +296,15 @@ class HondaLinkAPI:
         if not request_id:
             return HondaLinkCommandResult(None, data)
 
-        result = await self._poll_cig_result("dbd", request_id, timeout=60, poll_interval=3)
+        result = await self._poll_cig_result(
+            "dbd", request_id, timeout=60, poll_interval=3
+        )
         return HondaLinkCommandResult(request_id, result)
 
-    async def async_start_engine(self, *, extend: bool = False) -> HondaLinkCommandResult:
+    async def async_start_engine(
+        self, *, extend: bool = False
+    ) -> HondaLinkCommandResult:
+        """Async start engine."""
         return await self._async_cig_command(
             "eng",
             "srt",
@@ -275,6 +312,7 @@ class HondaLinkAPI:
         )
 
     async def async_stop_engine(self) -> HondaLinkCommandResult:
+        """Async stop engine."""
         return await self._async_cig_command(
             "eng",
             "sop",
@@ -282,21 +320,30 @@ class HondaLinkAPI:
         )
 
     async def async_lock(self) -> HondaLinkCommandResult:
+        """Async lock."""
         body = {"device": self._vin(), "pin": self._pin()}
         if self.lock_command == DEFAULT_LOCK_COMMAND:
             body["delay"] = {"unit": "Minutes", "value": 2}
         try:
             return await self._async_cig_command("lk", self.lock_command, body)
         except HondaLinkCommandError as err:
-            if self.lock_command != LEGACY_LOCK_COMMAND or not _is_dynamic_backend_error(err):
+            if (
+                self.lock_command != LEGACY_LOCK_COMMAND
+                or not _is_dynamic_backend_error(err)
+            ):
                 raise
         return await self._async_cig_command(
             "lk",
             DEFAULT_LOCK_COMMAND,
-            {"device": self._vin(), "pin": self._pin(), "delay": {"unit": "Minutes", "value": 2}},
+            {
+                "device": self._vin(),
+                "pin": self._pin(),
+                "delay": {"unit": "Minutes", "value": 2},
+            },
         )
 
     async def async_unlock(self) -> HondaLinkCommandResult:
+        """Async unlock."""
         try:
             return await self._async_cig_command(
                 "lk",
@@ -304,7 +351,10 @@ class HondaLinkAPI:
                 {"device": self._vin(), "pin": self._pin()},
             )
         except HondaLinkCommandError as err:
-            if self.unlock_command != LEGACY_UNLOCK_COMMAND or not _is_dynamic_backend_error(err):
+            if (
+                self.unlock_command != LEGACY_UNLOCK_COMMAND
+                or not _is_dynamic_backend_error(err)
+            ):
                 raise
         return await self._async_cig_command(
             "lk",
@@ -313,6 +363,7 @@ class HondaLinkAPI:
         )
 
     async def async_horn(self) -> HondaLinkCommandResult:
+        """Async horn."""
         return await self._async_cig_command(
             "cfhl",
             "hrn",
@@ -320,6 +371,7 @@ class HondaLinkAPI:
         )
 
     async def async_lights(self) -> HondaLinkCommandResult:
+        """Async lights."""
         return await self._async_cig_command(
             "cfhl",
             "lgt",
@@ -327,6 +379,7 @@ class HondaLinkAPI:
         )
 
     async def async_stop_horn_lights(self) -> HondaLinkCommandResult:
+        """Async stop horn lights."""
         return await self._async_cig_command(
             "cfhl",
             "sop",
@@ -381,7 +434,11 @@ class HondaLinkAPI:
             )
             last_data = data
             response_body = data.get("responseBody") or {}
-            status = _lower_status(data.get("status") or response_body.get("status") or response_body.get("commandStatus"))
+            status = _lower_status(
+                data.get("status")
+                or response_body.get("status")
+                or response_body.get("commandStatus")
+            )
 
             if status in ("success", "completed", "complete", "ok"):
                 return data
@@ -391,7 +448,9 @@ class HondaLinkAPI:
 
             await asyncio.sleep(poll_interval)
 
-        raise HondaLinkCommandError(f"Command timed out waiting for completion: {last_data}")
+        raise HondaLinkCommandError(
+            f"Command timed out waiting for completion: {last_data}"
+        )
 
     async def _request_identity(
         self,
@@ -450,12 +509,18 @@ class HondaLinkAPI:
             try:
                 payload = json.loads(text) if text else {}
             except json.JSONDecodeError as err:
-                raise HondaLinkError(f"Invalid JSON from HondaLink: {response.status} {text}") from err
+                raise HondaLinkError(
+                    f"Invalid JSON from HondaLink: {response.status} {text}"
+                ) from err
 
             if response.status in (401, 403):
-                raise HondaLinkAuthError(f"HondaLink authorization failed: {_redact_payload(payload)}")
+                raise HondaLinkAuthError(
+                    f"HondaLink authorization failed: {_redact_payload(payload)}"
+                )
             if response.status >= 400:
-                raise HondaLinkError(f"HondaLink request failed: HTTP {response.status} {_redact_payload(payload)}")
+                raise HondaLinkError(
+                    f"HondaLink request failed: HTTP {response.status} {_redact_payload(payload)}"
+                )
             return payload
 
     def _api_headers(self) -> dict[str, str]:
@@ -491,3 +556,35 @@ class HondaLinkAPI:
         if not self.pin:
             raise HondaLinkCommandError("Remote PIN is required")
         return self.pin
+
+
+class DashboardData:
+    """Dashboard data."""
+
+    def __init__(self, vin: str, data: dict[str, Any]) -> None:
+        """Initialize."""
+        self.vin = vin
+        self.data = data
+
+    @property
+    def name(self) -> str | None:
+        """Name."""
+        return self.data.get("name")
+
+    @property
+    def first_row_driver_door_opened(self) -> bool:
+        """First row driver door opened."""
+        value = (
+            self.data.get("doorStatus", {}).get("firstRowDriver", {}).get("openState")
+        )
+        return isinstance(value, str) and value.lower() != "closed"
+
+    @property
+    def first_row_passenger_door_opened(self) -> bool:
+        """First row passenger door opened."""
+        value = (
+            self.data.get("doorStatus", {})
+            .get("firstRowPassenger", {})
+            .get("openState")
+        )
+        return isinstance(value, str) and value.lower() != "closed"
