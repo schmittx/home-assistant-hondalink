@@ -4,7 +4,7 @@ import logging
 from typing import Any
 import uuid
 
-import voluptuous as vol
+import probatio
 
 from homeassistant import config_entries
 from homeassistant.const import UnitOfTime
@@ -123,14 +123,14 @@ class HondaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
                 return await self.async_step_vehicle()
 
-        schema = vol.Schema(
+        schema = probatio.Schema(
             {
-                vol.Required(CONF_EMAIL): TextSelector(
+                probatio.Required(CONF_EMAIL): TextSelector(
                     TextSelectorConfig(
                         type=TextSelectorType.EMAIL,
                     )
                 ),
-                vol.Required(CONF_PASSWORD): TextSelector(
+                probatio.Required(CONF_PASSWORD): TextSelector(
                     TextSelectorConfig(
                         type=TextSelectorType.PASSWORD,
                     )
@@ -170,9 +170,9 @@ class HondaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 )
 
-        schema = vol.Schema(
+        schema = probatio.Schema(
             {
-                vol.Required(CONF_NAME): SelectSelector(
+                probatio.Required(CONF_NAME): SelectSelector(
                     SelectSelectorConfig(
                         options=[
                             _vehicle_label(vehicle)
@@ -182,7 +182,7 @@ class HondaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         sort=True,
                     )
                 ),
-                vol.Required(CONF_PIN): TextSelector(
+                probatio.Required(CONF_PIN): TextSelector(
                     TextSelectorConfig(type=TextSelectorType.NUMBER)
                 ),
             }
@@ -252,9 +252,9 @@ class HondaLinkOptionsFlowHandler(config_entries.OptionsFlow):
 
         options = self.config_entry.options
         data = self.config_entry.data
-        schema = vol.Schema(
+        schema = probatio.Schema(
             {
-                vol.Required(
+                probatio.Required(
                     CONF_PIN,
                     default=options.get(CONF_PIN, data.get(CONF_PIN, "")),
                 ): TextSelector(
@@ -262,7 +262,7 @@ class HondaLinkOptionsFlowHandler(config_entries.OptionsFlow):
                         type=TextSelectorType.NUMBER,
                     )
                 ),
-                vol.Required(
+                probatio.Required(
                     CONF_SCAN_INTERVAL,
                     default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                 ): NumberSelector(
@@ -270,7 +270,7 @@ class HondaLinkOptionsFlowHandler(config_entries.OptionsFlow):
                         unit_of_measurement=UnitOfTime.MINUTES,
                     )
                 ),
-                vol.Required(
+                probatio.Required(
                     CONF_LOCK_COMMAND,
                     default=options.get(CONF_LOCK_COMMAND, DEFAULT_LOCK_COMMAND),
                 ): TextSelector(
@@ -278,7 +278,7 @@ class HondaLinkOptionsFlowHandler(config_entries.OptionsFlow):
                         type=TextSelectorType.TEXT,
                     )
                 ),
-                vol.Required(
+                probatio.Required(
                     CONF_UNLOCK_COMMAND,
                     default=options.get(CONF_UNLOCK_COMMAND, DEFAULT_UNLOCK_COMMAND),
                 ): TextSelector(
