@@ -22,6 +22,7 @@ class HondaLinkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, hass: HomeAssistant, entry: ConfigEntry, api: HondaLinkAPI
     ) -> None:
         """Initialize."""
+        self.entry = entry
         self.api = api
         self.vin = entry.data[CONF_VIN]
         interval = int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
@@ -34,7 +35,17 @@ class HondaLinkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
-            return await self.api.async_get_dashboard_latest(self.vin)
+            data = await self.api.async_get_dashboard_latest(self.vin)
+            auth_data = self.api.export_auth_data()
+            if any(
+                self.entry.data.get(k) != v
+                for k, v in auth_data.items()
+                if v is not None
+            ):
+                self.hass.config_entries.async_update_entry(
+                    self.entry, data={**self.entry.data, **auth_data}
+                )
+            return data
         except HondaLinkError as err:
             raise UpdateFailed(str(err)) from err
 
